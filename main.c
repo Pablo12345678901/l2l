@@ -10,14 +10,11 @@
 /* TO DEV
     
     Functions :
-    - repeat the two last steps a random number of time.
-    - concatenate the output.
-    
-    - show_random_output.
     - user_evaluation.
     - take into account user_evaluation.
 
     Features :
+    - manage separator : '\n' ' '
     - get the directory of this script to add the data dir into the same dir as it.
     - restart -> loop into main.
     
@@ -115,10 +112,11 @@ char* concat(int count, ...)
     return merged;
 }
 
-int random_get_from_range(int min, int max){
-  // Link seed to the time to get ALWAYS different results.
-  srand(time(NULL)); 
-  return min + rand() / (RAND_MAX / (max - min + 1) + 1);
+int random_get_from_range(int min, int max)
+{
+  int random_number = min + rand() / (RAND_MAX / (max - min + 1) + 1) ;
+  printf("Random number : %d\n", random_number) ;
+  return random_number ;
 }
 
 char* get_line_content_from_file(char * file_path, int line_number, int length)
@@ -138,18 +136,19 @@ char* get_line_content_from_file(char * file_path, int line_number, int length)
   } while((fscanf(fptr, "%*[^\n]"), fscanf(fptr, "%*c")) != EOF);
   fclose(fptr);
   if(current_line == line_number)
-  { return line_content ;
-      //printf("%s", line_content);
-  }
+  { return line_content ; }
   else
-    { return NULL ; // in case of error
-  }
+    { return NULL ; } // in case of error
 }
 
 
 int main()
-{   
-    int length = 10 ;
+{
+    // Link seed to the time to get ALWAYS different results.
+    srand(time(NULL)) ;
+  
+    int i ; // used in several loops
+    int length = 100 ;
     char input_from_user[length] ;
     char data_dir[] = "data" ;
     char file_basename[] = "inputs_list.txt" ;
@@ -167,25 +166,43 @@ int main()
     else
       { printf("The directory \"%s\" already exists.\n", data_dir) ; }
     */
-      
+
+    /*
+    // Optional : Empty file
     empty_file(file_path) ;
 
-    int i ;
+    // Get inputs from user
     for (i=0 ; i<5; i++)
     {
         read_input(&ptr_input, length) ;
         printf("Input provided : '%s'\n", input_from_user) ;
         write_input_to_file(&ptr_input, file_path) ;
     }
+    */
     
     int lines = lines_number_get(file_path) ;
     int minimum_number = 1 ;
-    int rand_number = random_get_from_range(minimum_number, lines) ;
-    printf("Random number : %d\n", rand_number) ;
-    
-    char * output ;
-    output = get_line_content_from_file(file_path, rand_number, length) ;
-    printf("Line content : '%s'", output) ;
+    int max_number_of_outputs = 10 ;
+    int number_of_random_outputs_to_get = random_get_from_range(minimum_number, max_number_of_outputs) ;
+    char * new_output ;
+    char * current_output ; 
+    char * final_output ;
+    int rand_number ;
+
+    // Define current_output
+    rand_number = random_get_from_range(minimum_number, lines) ;
+    current_output = get_line_content_from_file(file_path, rand_number, length) ;
+    // Start at second loop with index of 1.
+    for (i=1 ; i<number_of_random_outputs_to_get; i++)
+    {
+        rand_number = random_get_from_range(minimum_number, lines) ;
+        new_output = get_line_content_from_file(file_path, rand_number, length) ;
+	final_output = concat(2, current_output, new_output) ;
+	current_output = final_output ;
+    }
+
+    // Print output
+    printf("Final output size %d\nContent '%s'\n", number_of_random_outputs_to_get, final_output) ;
     
     return 0 ;
  }
