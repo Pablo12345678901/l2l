@@ -10,14 +10,15 @@
 /* TO DEV
     
     Functions :
-    - user_evaluation.
+    - fill an output array of size X.
+    - present them to user.
+    - the user evaluate the best output.
     - take into account user_evaluation.
 
     Features :
-    - manage separator : '\n' ' '
     - get the directory of this script to add the data dir into the same dir as it.
     - restart -> loop into main.
-    
+
 */
 
 void read_input(char **ptr_input, int lenght_wished)
@@ -115,7 +116,6 @@ char* concat(int count, ...)
 int random_get_from_range(int min, int max)
 {
   int random_number = min + rand() / (RAND_MAX / (max - min + 1) + 1) ;
-  printf("Random number : %d\n", random_number) ;
   return random_number ;
 }
 
@@ -141,6 +141,13 @@ char* get_line_content_from_file(char * file_path, int line_number, int length)
     { return NULL ; } // in case of error
 }
 
+
+size_t strlen(const char *str)
+{
+    const char *s;
+    for (s = str; *s; ++s);
+    return(s - str);
+}
 
 int main()
 {
@@ -187,22 +194,39 @@ int main()
     char * new_output ;
     char * current_output ; 
     char * final_output ;
+    // Define here the special char that can be separators.
+    char* special_char_list = " " ;
+    int special_char_list_length = strlen(special_char_list) ;
+    int random_index_special_char ; 
+    char random_special_char ;
     int rand_number ;
+    int new_output_length ;
 
     // Define current_output
-    rand_number = random_get_from_range(minimum_number, lines) ;
-    current_output = get_line_content_from_file(file_path, rand_number, length) ;
-    // Start at second loop with index of 1.
-    for (i=1 ; i<number_of_random_outputs_to_get; i++)
+    current_output = "" ;
+    
+    // Get outputs
+    for (i=0 ; i<number_of_random_outputs_to_get; i++)
     {
         rand_number = random_get_from_range(minimum_number, lines) ;
         new_output = get_line_content_from_file(file_path, rand_number, length) ;
+	new_output_length = strlen(new_output) ;
+	// Replace the separator '\n' by a special char defined in the above list.
+	if (new_output[new_output_length-1] == '\n')
+        {
+	  random_index_special_char = random_get_from_range(0, special_char_list_length) ;
+	  random_special_char = special_char_list[random_index_special_char] ;
+	  new_output[new_output_length-1] = random_special_char ;
+	}
+
+	// Concatenate current output with new output
 	final_output = concat(2, current_output, new_output) ;
+	// Set current output to (new) final_output
 	current_output = final_output ;
     }
 
     // Print output
-    printf("Final output size %d\nContent '%s'\n", number_of_random_outputs_to_get, final_output) ;
+    printf("Output produced : '%s'\n", final_output) ;
     
     return 0 ;
  }
