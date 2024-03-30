@@ -2,3 +2,10 @@
 *~*
 *#*
 
+# No data dir
+data/
+data/*
+
+# No the compiled main.
+main
+
