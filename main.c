@@ -4,12 +4,15 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
+#include <time.h>        // time()
+#include <unistd.h>      // sleep()
 
 /* TO DEV
     
     Functions :
-    - create_random_output on existing list.
+    - repeat the two last steps a random number of time.
+    - concatenate the output.
+    
     - show_random_output.
     - user_evaluation.
     - take into account user_evaluation.
@@ -42,14 +45,13 @@ void read_input(char **ptr_input, int lenght_wished)
     }
 }
 
-void empty_file(FILE *fptr, char *filename)
+void empty_file(char *file_path)
 {
-    fptr = fopen(filename, "w") ;
-    //fptr = fopen("input_list.txt", "w") ;
+    FILE *fptr = fopen(file_path, "w") ;
     fclose(fptr); 
 }
 
-void write_input_to_file(char **ptr_input, char *filename, FILE *fptr)
+void write_input_to_file(char **ptr_input, char *file_path)
 {
     int i = 0 ;
     if (*ptr_input == NULL)
@@ -57,7 +59,7 @@ void write_input_to_file(char **ptr_input, char *filename, FILE *fptr)
         return ;
     }
 
-    fptr = fopen(filename, "a") ;
+    FILE *fptr = fopen(file_path, "a") ;
     while ((*ptr_input)[i] != '\0')
     {
       fputc((*ptr_input)[i], fptr) ;
@@ -65,6 +67,22 @@ void write_input_to_file(char **ptr_input, char *filename, FILE *fptr)
     }
     fprintf(fptr, "\n") ;
     fclose(fptr); 
+}
+
+// Count the number of lines within a file.
+int lines_number_get(char *file_path)
+{
+  FILE *fptr = fopen(file_path, "r");
+  long int lines =0;
+
+  if ( fptr == NULL ) {
+    return -1;
+  }
+
+  while (EOF != (fscanf(fptr, "%*[^\n]"), fscanf(fptr,"%*c")))
+        ++lines;
+  
+  return lines;
 }
 
 // Concatenate a number of 'count' string passed to the function.
@@ -97,9 +115,41 @@ char* concat(int count, ...)
     return merged;
 }
 
+int random_get_from_range(int min, int max){
+  // Link seed to the time to get ALWAYS different results.
+  srand(time(NULL)); 
+  return min + rand() / (RAND_MAX / (max - min + 1) + 1);
+}
+
+char* get_line_content_from_file(char * file_path, int line_number, int length)
+{
+  int max_length = length + 1 ; 
+  char *line_content = calloc(sizeof(char), max_length); 
+  int current_line = 0 ;
+  FILE *fptr = fopen(file_path, "r") ;
+  
+  do 
+  {
+    if (++current_line == line_number) {
+      fgets(line_content, sizeof line_content, fptr);
+      break;
+    }
+
+  } while((fscanf(fptr, "%*[^\n]"), fscanf(fptr, "%*c")) != EOF);
+  fclose(fptr);
+  if(current_line == line_number)
+  { return line_content ;
+      //printf("%s", line_content);
+  }
+  else
+    { return NULL ; // in case of error
+  }
+}
+
+
 int main()
 {   
-    int length = 100 ;
+    int length = 10 ;
     char input_from_user[length] ;
     char data_dir[] = "data" ;
     char file_basename[] = "inputs_list.txt" ;
@@ -108,6 +158,7 @@ int main()
     ptr_input = input_from_user ;
     FILE *fptr;
 
+    /*
     // Test whether the data directory exists and create it else.
     struct stat st = {0};
     if (stat(data_dir, &st) == -1)
@@ -115,17 +166,27 @@ int main()
         mkdir(data_dir, 0777); }
     else
       { printf("The directory \"%s\" already exists.\n", data_dir) ; }
-    
-    empty_file(fptr, file_path) ;
-    
-    read_input(&ptr_input, length) ;
-    printf("Input provided : '%s'\n", input_from_user) ;
+    */
+      
+    empty_file(file_path) ;
 
-    write_input_to_file(&ptr_input, file_path, fptr) ;
+    int i ;
+    for (i=0 ; i<5; i++)
+    {
+        read_input(&ptr_input, length) ;
+        printf("Input provided : '%s'\n", input_from_user) ;
+        write_input_to_file(&ptr_input, file_path) ;
+    }
     
-    read_input(&ptr_input, length) ;
-    printf("Input provided : '%s'\n", input_from_user) ;
-    write_input_to_file(&ptr_input, file_path, fptr) ;
+    int lines = lines_number_get(file_path) ;
+    int minimum_number = 1 ;
+    int rand_number = random_get_from_range(minimum_number, lines) ;
+    printf("Random number : %d\n", rand_number) ;
+    
+    char * output ;
+    output = get_line_content_from_file(file_path, rand_number, length) ;
+    printf("Line content : '%s'", output) ;
+    
     return 0 ;
  }
 
