@@ -10,9 +10,9 @@
 /* TO DEV
     
     Functions :
-    - fill an output array of size X.
+    - fill an output array of size 10.
     - present them to user.
-    - the user evaluate the best output.
+    - the user evaluate the best output - no output.
     - take into account user_evaluation.
 
     Features :
