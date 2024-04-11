@@ -49,7 +49,7 @@ fi
 # Control if the data directory exists
 if  [ ! -d "$DIR_DATA" ]
 then
-    STDERR_show_message "\nERROR : there is data directory at the path of DIR_RESULTS : \"$DIR_DATA\". \nPlease create it and import into your data before re-running this script $(basename $0) located \"$SCRIPT_DIRECTORY\".\n"
+    STDERR_show_message "\nERROR : there is no data directory at the path of DIR_RESULTS : \"$DIR_DATA\". \nPlease create it and import into your data before re-running this script $(basename $0) located \"$SCRIPT_DIRECTORY\".\n"
     exit 1
 fi
 
@@ -73,22 +73,23 @@ do
     echo "$EACH_LETTER" >> "$PATH_LIST_OF_BASE_TOKEN"
 done
 
-# If the enhanced token file exists
-if [ -f  "$PATH_LIST_OF_ENHANCED_TOKEN" ]
+# If the enhanced token file does not exists
+if [ ! -f  "$PATH_LIST_OF_ENHANCED_TOKEN" ]
 then
-    # Use it instead of the base token one.
-    PATH_LIST_OF_BASE_TOKEN="$PATH_LIST_OF_ENHANCED_TOKEN"
-else
-    # Else copy the existent base token file to it.
+    # Copy the base token to it.
     cp "$PATH_LIST_OF_BASE_TOKEN" "$PATH_LIST_OF_ENHANCED_TOKEN"
 fi
 
-# Get the total number of token
-NUMBER_OF_TOKEN=${#ARRAY_TOKEN[@]}
+# Set the path of base token to the enhanced ones.
+PATH_LIST_OF_BASE_TOKEN="$PATH_LIST_OF_ENHANCED_TOKEN"
+
+# Update the number of token and therefore the maximum index available by counting the lines of the file.
+# As it can increase from a run to another, it is important to do it in order to enjoy the new token chunch as available token.
+NUMBER_OF_TOKEN="$(cat $PATH_LIST_OF_BASE_TOKEN | wc -l)"
 INDEX_MAX_TOKEN=$((NUMBER_OF_TOKEN-1))
+
 # Set the dummy index for empty letter in a word as index_max + 1
 # Could be enhanced to be set to 0).
-#DUMMY_INDEX_FOR_NO_TOKEN=$((INDEX_MAX_TOKEN++))
 DUMMY_INDEX_FOR_NO_TOKEN=$((INDEX_MAX_TOKEN+1))
 
 # Set the range between which the each word lenght will be randomly choosed
