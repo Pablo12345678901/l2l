@@ -1,0 +1,225 @@
+#!/usr/bin/env bash
+
+source functions_personal
+
+: <<"TODO"
+
+- Option management.
+- Test command failure + Error message.
+- Exit code incrementation.
+- Use as much as possible array of int.
+- Anaylse results, optimize model.
+
+TODO
+
+# Set the main directory to the one where you place this script.
+SCRIPT_DIRECTORY="$(dirname -- "${BASH_SOURCE[0]}")"
+
+# Main indicators to set the model
+NUMBER_OF_WISHED_PROPOSED_RESULTS=10000 # Number of index within the array of proposed results.
+AVERAGE_WORD_LENGTH=7
+VARIATION_MAX_WORD_SIZE=6 # Useful when the randomly size of the word will be set in the range "1 <-> AVERAGE_WORD_LENGHT+VARIATION"
+
+# The output directory will contain two files :
+# - the list of "timestamps delta_timestamps index delta_indexes" to show the progression between each match of good word.
+# - the new list of token enhanced with new token_chuncks produced randomly from the match between the token themselves produced randomly and a dictionary. 
+DIR_RESULTS="${SCRIPT_DIRECTORY}/output/"
+BASENAME_LIST_DELTAS_TIMESTAMPS_AND_INDEXES_BETWEEN_GOOD_RESULTS="deltas_timestamps_and_indexes_between_good_results.txt"
+PATH_LIST_DELTAS_TIMESTAMPS_AND_INDEXES_BETWEEN_GOOD_RESULTS="${DIR_RESULTS}/${BASENAME_LIST_DELTAS_TIMESTAMPS_AND_INDEXES_BETWEEN_GOOD_RESULTS}"
+BASENAME_LIST_OF_ENHANCED_TOKEN="enhanced_token.txt"
+PATH_LIST_OF_ENHANCED_TOKEN="${DIR_RESULTS}/${BASENAME_LIST_OF_ENHANCED_TOKEN}"
+BASENAME_DUMMY_FILE_TO_RECEIVE_SIGNAL_TO_SHOW_THAT_COMMAND_IS_FINISHED="dummy_file_to_receive_signal_to_show_that_command_is_finished.txt"
+PATH_DUMMY_FILE_TO_RECEIVE_SIGNAL_TO_SHOW_THAT_COMMAND_IS_FINISHED="${DIR_RESULTS}/${BASENAME_DUMMY_FILE_TO_RECEIVE_SIGNAL_TO_SHOW_THAT_COMMAND_IS_FINISHED}"
+
+# The data directory contains a list of base token that will be created by the script itself..
+DIR_DATA="${SCRIPT_DIRECTORY}/data"
+BASENAME_LIST_OF_BASE_TOKEN="base_token.txt"
+PATH_LIST_OF_BASE_TOKEN="${DIR_DATA}/${BASENAME_LIST_OF_BASE_TOKEN}"
+# Data source : https://github.com/dwyl/english-words/blob/master/words_alpha.txt
+BASENAME_DICTIONARY="words_alpha.txt"
+PATH_DICTIONARY="${DIR_DATA}/${BASENAME_DICTIONARY}"
+
+# Control if the result directory exists
+if [ ! -d "$DIR_RESULTS" ]
+then
+    # Create it else
+    mkdir -p "$DIR_RESULTS"
+fi
+
+# Control if the data directory exists
+if  [ ! -d "$DIR_DATA" ]
+then
+    STDERR_show_message "\nERROR : there is data directory at the path of DIR_RESULTS : \"$DIR_DATA\". \nPlease create it and import into your data before re-running this script $(basename $0) located \"$SCRIPT_DIRECTORY\".\n"
+    exit 1
+fi
+
+# If the based token file exists
+if [  -f  "$PATH_LIST_OF_BASE_TOKEN" ]
+then
+    # Remove it.
+    rm -rf "$PATH_LIST_OF_BASE_TOKEN" ||
+    { STDERR_show_message "\nERROR : could not remove the existent file \"$BASENAME_LIST_OF_BASE_TOKEN\" located \"$PATH_LIST_OF_BASE_TOKEN\".\n"
+      exit 2
+    }
+fi
+
+# Fill the token array.
+# Could add also the majuscule for at the beginning of the word
+declare -a ARRAY_TOKEN
+for EACH_LETTER in {a..z} #{A..Z}
+do
+    ARRAY_TOKEN+=("$EACH_LETTER")
+    # Add each base token to a file.
+    echo "$EACH_LETTER" >> "$PATH_LIST_OF_BASE_TOKEN"
+done
+
+# If the enhanced token file exists
+if [ -f  "$PATH_LIST_OF_ENHANCED_TOKEN" ]
+then
+    # Use it instead of the base token one.
+    PATH_LIST_OF_BASE_TOKEN="$PATH_LIST_OF_ENHANCED_TOKEN"
+else
+    # Else copy the existent base token file to it.
+    cp "$PATH_LIST_OF_BASE_TOKEN" "$PATH_LIST_OF_ENHANCED_TOKEN"
+fi
+
+# Get the total number of token
+NUMBER_OF_TOKEN=${#ARRAY_TOKEN[@]}
+INDEX_MAX_TOKEN=$((NUMBER_OF_TOKEN-1))
+# Set the dummy index for empty letter in a word as index_max + 1
+# Could be enhanced to be set to 0).
+#DUMMY_INDEX_FOR_NO_TOKEN=$((INDEX_MAX_TOKEN++))
+DUMMY_INDEX_FOR_NO_TOKEN=$((INDEX_MAX_TOKEN+1))
+
+# Declare a two dimension array that will contains the list of array of proposed indexes (that can be translated to a list of words).
+LENGTH_MAX_WORD=$((AVERAGE_WORD_LENGTH+VARIATION_MAX_WORD_SIZE))
+declare -A ARRAY_PROPOSED_TOKEN_INDEXES_ARRAYS
+X_DIMENSION_SIZE=$NUMBER_OF_WISHED_PROPOSED_RESULTS
+Y_DIMENSION_SIZE=$LENGTH_MAX_WORD
+
+declare -a ARRAY_RESULTS_TRUE_FALSE_INT
+
+# Loop to produce the results
+for ((a=0; a<$NUMBER_OF_WISHED_PROPOSED_RESULTS; a++))
+do
+    # Get a random variation to apply to the average lenght of a word to increase the probability to find a good result.
+    VARIATION=$(shuf -i 0-$VARIATION_MAX_WORD_SIZE -n 1)
+    CURRENT_REQUIRED_NUMBER_OF_INDEXES=$((AVERAGE_WORD_LENGTH+VARIATION))
+    # Loop on each letter
+    for ((b=0; b<$((CURRENT_REQUIRED_NUMBER_OF_INDEXES)); b++ ))
+    do
+	# Get a random index from the range, each index = one token
+	CURRENT_PROPOSED_INDEX=$(shuf -i 0-$INDEX_MAX_TOKEN -n 1)
+	# Add the token index to the array
+	ARRAY_PROPOSED_TOKEN_INDEXES_ARRAYS[$a,$b]=$CURRENT_PROPOSED_INDEX
+	# Add the equivalent letter to a 'word' variable
+	WORD+="${ARRAY_TOKEN[$CURRENT_PROPOSED_INDEX]}"
+    done
+    # Fill the non-letter with a dummy number
+    if [ $CURRENT_REQUIRED_NUMBER_OF_INDEXES -lt $LENGTH_MAX_WORD ]
+    then
+	NUMBER_OF_INDEXES_TO_FILL=$((LENGTH_MAX_WORD-CURRENT_REQUIRED_NUMBER_OF_INDEXES))
+	FIRST_INDEX_TO_FILL=$((LENGTH_MAX_WORD-NUMBER_OF_INDEXES_TO_FILL))
+	for ((c=$FIRST_INDEX_TO_FILL; c<$LENGTH_MAX_WORD; c++))
+	do
+	    ARRAY_PROPOSED_TOKEN_INDEXES_ARRAYS[$a,$c]=$DUMMY_INDEX_FOR_NO_TOKEN
+	done
+    fi
+    
+    # Search silently the proposed word within the dictionary
+    # The represent a string that start by the word, and then a non-char at least once
+    grep --max-count=1 -E "^$WORD[^a-zA-Z]+" "$PATH_DICTIONARY" &>/dev/null
+
+    # Conserve the result of the dictionary check within the results array
+    ARRAY_RESULTS_TRUE_FALSE_INT+=($?)
+
+    # Unset the word
+    WORD=
+done
+
+# Get new tokens chunck and add them to the file
+PREVIOUS_INDEX_OF_POSITIVE_RESULT=
+
+for ((d=0; d<$NUMBER_OF_WISHED_PROPOSED_RESULTS ; d++))
+do
+    # Only if the result was good
+    if [ ${ARRAY_RESULTS_TRUE_FALSE_INT[$d]} -eq 0 ]
+    then
+	# Re-construct the word
+	for ((e=0 ; e<$LENGTH_MAX_WORD ; e++ ))
+	do
+	    CURRENT_TOKEN=${ARRAY_PROPOSED_TOKEN_INDEXES_ARRAYS[$d,$e]}
+	    # Check if it is a dummy token = means that the word ended and its length is lower than the maximum length.
+	    if [ $CURRENT_TOKEN -eq $DUMMY_INDEX_FOR_NO_TOKEN ]
+	    then
+		# Break loop to save CPU.
+		break
+	    else
+		# Else add the translated token to the word
+		MATCHED_WORD="${MATCHED_WORD}${ARRAY_TOKEN[$CURRENT_TOKEN]}"
+	    fi
+	done
+	
+	# Get the new tokens
+	# Get the word lenght
+	MATCHED_WORD_LENGTH=${#MATCHED_WORD}
+	MATCH_WORD_MAX_INDEX=$((MATCHED_WORD_LENGTH-1))
+	# Get a random chuck length
+	CHUNCK_LENGTH=$(shuf -i 1-$MATCHED_WORD_LENGTH -n 1)
+	FIRST_INDEX_OF_END_OF_CHUNCK=$((CHUNCK_LENGTH-1))
+	TOTAL_CHUCKS=$((MATCHED_WORD_LENGTH-CHUNCK_LENGTH+1))
+	# Always set the chunck start index to 0 before looping
+	CHUNCK_INDEX_START=0
+	# Get the current chuck
+	for ((f=$FIRST_INDEX_OF_END_OF_CHUNCK ; f<$MATCHED_WORD_LENGTH ; f++))
+	do
+	    NEW_CHUNCK="${MATCHED_WORD:CHUNCK_INDEX_START:CHUNCK_LENGTH}"
+	    # Test if it is already in the enhanced token list.
+	    # Search silently the proposed word within the enhanced token list.
+	    # The represent a string that start by the word, and then a non-char at least once
+	    grep --max-count=1 -E "^${NEW_CHUNCK}$" "$PATH_LIST_OF_ENHANCED_TOKEN" &>/dev/null
+	    # Test if it not present into the file
+	    if (($?))
+	    then
+		# If so, add it
+		echo "$NEW_CHUNCK" >> "$PATH_LIST_OF_ENHANCED_TOKEN"
+	    fi
+	    # Increase the start index at each loop
+	    ((CHUNCK_INDEX_START++))
+	done
+	# Unset the word for the next loop
+	MATCHED_WORD=
+
+	# Conserve the index of the current match
+	# If the current index of result is set so there is already a match
+	if [ ! -z $PREVIOUS_INDEX_OF_POSITIVE_RESULT ]
+	then
+	    # Compute the difference between timestamps of matched (=good) results.
+	    # Precision with nanoseconds.
+	    # DATE FORMAT : HOURS MINUTES SECONDS NANOSECONDS
+	    CURRENT_TIMESTAMP="$(date +%H:%M:%S:%N)"
+	    JOINED_TIMESTAMPS_STRING_FOR_COMPUTATION="$CURRENT_TIMESTAMP,$PREVIOUS_TIMESTAMP"
+	    DELTA_TIMESTAMPS=$(awk -F '[:, ]' '{print ($1*60*60*1000+$2*60*1000+$3*1000+$4)-($5*60*60*1000+$6*60*1000+$7*1000+$8)}' <<< "$JOINED_TIMESTAMPS_STRING_FOR_COMPUTATION")
+	    # Compute the difference between two index of matchs.
+	    CURRENT_INDEX_OF_POSITIVE_RESULT=$d
+	    DELTA_INDEXES_OF_POSITIVE_RESULTS=$((CURRENT_INDEX_OF_POSITIVE_RESULT-PREVIOUS_INDEX_OF_POSITIVE_RESULT))
+
+	    # Add the result to STDOUT and file with tee
+	    echo -e "DT: $DELTA_TIMESTAMPS \tDI: $DELTA_INDEXES_OF_POSITIVE_RESULTS \tCI: $CURRENT_INDEX_OF_POSITIVE_RESULT \tCT: $CURRENT_TIMESTAMP" |
+	    tee -a "$PATH_LIST_DELTAS_TIMESTAMPS_AND_INDEXES_BETWEEN_GOOD_RESULTS"  
+	fi
+
+	# And set the current index and timestamp to the current one
+	# DATE FORMAT : HOURS MINUTES SECONDS NANOSECONDS
+	PREVIOUS_TIMESTAMP="$(date +%H:%M:%S:%N)"
+	PREVIOUS_INDEX_OF_POSITIVE_RESULT=$d
+     fi
+done
+
+# Print confirmation message with timestamp at the end as this script can be long to execute.
+FINAL_SCRIPT_TIMESTAMP="$(date +%H:%M:%S:%N)"
+echo "$FINAL_SCRIPT_TIMESTAMP : OK : SCRIPT FINISHED" |
+# And tee this message to a dummy file that is monitored by the script that run a daemon
+tee -a "$PATH_DUMMY_FILE_TO_RECEIVE_SIGNAL_TO_SHOW_THAT_COMMAND_IS_FINISHED" 
+exit 0
+
