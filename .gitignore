@@ -6,6 +6,10 @@
 data/
 data/*
 
+# No output dir
+output/
+output/*
+
 # No the compiled main.
 main
 
