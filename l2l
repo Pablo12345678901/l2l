@@ -16,10 +16,10 @@ TODO
 SCRIPT_DIRECTORY="$(dirname -- "${BASH_SOURCE[0]}")"
 
 # Main indicators to set the model
-NUMBER_OF_WISHED_PROPOSED_RESULTS=10000 # Number of index within the array of proposed results.
-AVERAGE_WORD_LENGTH=7
-VARIATION_MAX_WORD_SIZE=6 # Useful when the randomly size of the word will be set in the range "1 <-> AVERAGE_WORD_LENGHT+VARIATION"
-
+NUMBER_OF_WISHED_PROPOSED_RESULTS=1000 # Number of index within the array of proposed results.
+AVERAGE_WORD_LENGTH=4
+VARIATION_MAX_WORD_SIZE=3 # The randomly size of the word will be set in the range "1 <-> AVERAGE_WORD_LENGHT+VARIATION" or "LENGTH_MIN_WORD <-> AVERAGE_WORD_LENGHT+VARIATION" if the lenght min. is greater than 1. Cannot be lower than 1 : 0 word lenght does not exists.
+ 
 # The output directory will contain two files :
 # - the list of "timestamps delta_timestamps index delta_indexes" to show the progression between each match of good word.
 # - the new list of token enhanced with new token_chuncks produced randomly from the match between the token themselves produced randomly and a dictionary. 
@@ -91,8 +91,21 @@ INDEX_MAX_TOKEN=$((NUMBER_OF_TOKEN-1))
 #DUMMY_INDEX_FOR_NO_TOKEN=$((INDEX_MAX_TOKEN++))
 DUMMY_INDEX_FOR_NO_TOKEN=$((INDEX_MAX_TOKEN+1))
 
-# Declare a two dimension array that will contains the list of array of proposed indexes (that can be translated to a list of words).
+# Set the range between which the each word lenght will be randomly choosed
+# Set the mininum
+# Avoid getting a word lenght of 0, always minimum lenght >=1
+if [ $((AVERAGE_WORD_LENGTH-VARIATION_MAX_WORD_SIZE)) -lt 1 ]
+then
+    # If < 1 : set to 1
+    LENGHT_MIN_WORD=1
+else
+    # Else, set normally
+    LENGTH_MIN_WORD=$((AVERAGE_WORD_LENGTH-VARIATION_MAX_WORD_SIZE))
+fi
+# Set the maximum
 LENGTH_MAX_WORD=$((AVERAGE_WORD_LENGTH+VARIATION_MAX_WORD_SIZE))
+
+# Declare a two dimension array that will contains the list of array of proposed indexes (that can be translated to a list of words).
 declare -A ARRAY_PROPOSED_TOKEN_INDEXES_ARRAYS
 X_DIMENSION_SIZE=$NUMBER_OF_WISHED_PROPOSED_RESULTS
 Y_DIMENSION_SIZE=$LENGTH_MAX_WORD
@@ -102,9 +115,8 @@ declare -a ARRAY_RESULTS_TRUE_FALSE_INT
 # Loop to produce the results
 for ((a=0; a<$NUMBER_OF_WISHED_PROPOSED_RESULTS; a++))
 do
-    # Get a random variation to apply to the average lenght of a word to increase the probability to find a good result.
-    VARIATION=$(shuf -i 0-$VARIATION_MAX_WORD_SIZE -n 1)
-    CURRENT_REQUIRED_NUMBER_OF_INDEXES=$((AVERAGE_WORD_LENGTH+VARIATION))
+    # Get a random lenght base on a range of min-max value (set on the top of the screen). If the average lenght of a word is well set, its increase the probability to find a good result.
+    CURRENT_REQUIRED_NUMBER_OF_INDEXES=$(shuf -i $LENGTH_MIN_WORD-$LENGTH_MAX_WORD -n 1)
     # Loop on each letter
     for ((b=0; b<$((CURRENT_REQUIRED_NUMBER_OF_INDEXES)); b++ ))
     do
