@@ -1,0 +1,150 @@
+#!/usr/bin/env bash
+
+source functions_personal
+
+function array_add_number_if_not_present
+{
+    # Syntax :
+    # $1 : ARRAY_TO_CHECK (variable)
+    # $2 : ELEMENT_TO_ADD_IF_NOT_PRESENT (value)
+    
+    local -n ARRAY_TO_CHECK=$1
+    local ELEMENT_TO_ADD_IF_NOT_PRESENT=$2
+    FLAG_ELEMENT_IS_WITHIN_ARRAY="false"
+    # Checking all elements one by one
+    ARRAY_SIZE=${#ARRAY_TO_CHECK[@]}
+    for ((i=0; i<ARRAY_SIZE; i++))
+    do
+	if [ ${ARRAY_TO_CHECK[$i]} -eq $ELEMENT_TO_ADD_IF_NOT_PRESENT ]
+	then
+	    # Set the flag to true
+	    FLAG_ELEMENT_IS_WITHIN_ARRAY="true"
+	    break
+	fi
+    done
+    # Add element only if flag is not true
+    if [ ! $FLAG_ELEMENT_IS_WITHIN_ARRAY == "true" ]
+    then
+	ARRAY_TO_CHECK+=($2)
+    fi
+}
+
+function agree_yes_no {
+    # Syntax :
+    # $1 : ANSWER (variable
+    # $2 : QUESTION (value)
+    # Answer returned : 'yes' or 'no'
+
+    local -n ANSWER=$1
+    local QUESTION="$2"
+    echo "" # Esthetic
+    read -p "$QUESTION" CHOICE
+    case "$CHOICE" in
+        [Yy]  )   CHOICE='yes';;
+        [Nn]    )   CHOICE='no';;
+        *       )   echo -e "\nERROR : Please write \n\"Yy\" for \"Yes\"\n\"Nn\" for \"No\""
+		    # Loop while false
+                    agree_yes_no $1 "$2"
+        ;;
+    esac
+    ANSWER="$CHOICE"
+} < /dev/tty
+
+function array_of_numbers_sort {
+    # Syntax :
+    # $1 : CURRENT_ARRAY (variable)
+    # $2 : NEW_ARRAY (variable)
+
+    local -n CURRENT_ARRAY=$1
+    local -n NEW_ARRAY=$2
+    NEW_ARRAY=( $( printf "%s\n" "${CURRENT_ARRAY[@]}" | sort -g ) )
+}
+
+##############################################################
+################### MAIN CODE ################################
+##############################################################
+
+NUMBER_OF_PROPOSITIONS=100
+
+declare -a ARRAY_COLORS
+#: <<"ALLCOLORSAVAILABLE"
+NUMBER_OF_POSSIBILITIES=0
+# Foreground / Background
+#for fgbg in 38 48
+for fgbg in 48 # Only colored background, no black background with colorized text.
+do
+    # Colors
+    for color in {0..255}
+    do
+        # Display the color
+	#printf "\e[${fgbg};5;%sm  %3s  \e[0m" $color $color
+	ARRAY_COLORS+=($color)
+	#printf "\e[${fgbg};5;%sm    \e[0m" $color $color
+        # Display 6 colors per lines
+	((NUMBER_OF_POSSIBILITIES++))
+        #if [ $((($color + 1) % 6)) == 4 ]
+	#then
+        #    echo # New line
+        #fi
+    done
+    #echo # New line
+done
+#echo -e "\nDEBUG : There is $NUMBER_OF_POSSIBILITIES differents output possible.\n"
+#ALLCOLORSAVAILABLE
+
+INDEX_MAX_TOKEN=$((NUMBER_OF_POSSIBILITIES-1))
+
+declare -a ARRAY_TOKEN_PROPOSITIONS
+# Get X propositions 
+for ((i=0; i<$NUMBER_OF_PROPOSITIONS ; i++))
+do
+    # Get a random index from the range, each index = one token
+    # 127 : because from 0-127, the color is black
+    CURRENT_PROPOSED_INDEX=$(shuf -i 0-$INDEX_MAX_TOKEN -n 1)
+    # Add the token index to the array but only if it does not exists within already
+    # This avoid duplicatas.
+    array_add_number_if_not_present ARRAY_TOKEN_PROPOSITIONS $CURRENT_PROPOSED_INDEX
+done
+
+# Lowering the visual differences by sorting the array
+array_of_numbers_sort ARRAY_TOKEN_PROPOSITIONS TOKEN_ALREADY_PROPOSED
+
+NUMBER_OF_LINES=20
+NUMBER_OF_SPACES=80
+# Create a dummy string with X line(s), Y space(s) by line
+for ((l=0; l<$NUMBER_OF_LINES; l++))
+do
+    for ((s=0; s<$NUMBER_OF_SPACES; s++))
+    do
+	DUMMY_STRING="${DUMMY_STRING} "
+    done
+    DUMMY_STRING="${DUMMY_STRING}\n"
+done
+
+# Process propositions list
+NUMBER_OF_PROPOSITIONS_WITHOUT_DUPLICATA=${#TOKEN_ALREADY_PROPOSED[@]}
+QUESTION_TO_AGREE="Do you find the above color beautiful enough ? "
+
+
+for ((i=0; i<$NUMBER_OF_PROPOSITIONS_WITHOUT_DUPLICATA ; i++))
+do
+    # Print color to user
+    printf "\e[${fgbg};5;%sm$DUMMY_STRING\e[0m" ${TOKEN_ALREADY_PROPOSED[$i]}
+    #echo ""
+    FLAG_OKAY_WITH_COLOR=""
+    # Ask user if it was ok
+    agree_yes_no FLAG_OKAY_WITH_COLOR "$QUESTION_TO_AGREE"
+    if [ "$FLAG_OKAY_WITH_COLOR" == "yes" ]
+    then
+	# If agree, break.
+	echo -e "\nGreat ! Your choice was '${TOKEN_ALREADY_PROPOSED[$i]}'\n"
+	break
+    else
+	# Else, retry
+	echo -e "\nThen... let's try another one !\n"
+    fi
+done
+
+echo "SCRIPT END"
+
+exit 0
