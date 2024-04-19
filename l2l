@@ -18,7 +18,7 @@ SCRIPT_DIRECTORY="$(dirname -- "${BASH_SOURCE[0]}")"
 # Main indicators to set the model
 NUMBER_OF_WISHED_PROPOSED_RESULTS=1000 # Number of index within the array of proposed results.
 AVERAGE_WORD_LENGTH=4
-VARIATION_MAX_WORD_SIZE=3 # The randomly size of the word will be set in the range "1 <-> AVERAGE_WORD_LENGHT+VARIATION" or "LENGTH_MIN_WORD <-> AVERAGE_WORD_LENGHT+VARIATION" if the lenght min. is greater than 1. Cannot be lower than 1 : 0 word lenght does not exists.
+VARIATION_MAX_WORD_SIZE=2 # The randomly size of the word will be set in the range "1 <-> AVERAGE_WORD_LENGHT+VARIATION" or "LENGTH_MIN_WORD <-> AVERAGE_WORD_LENGHT+VARIATION" if the lenght min. is greater than 1. Cannot be lower than 1 : 0 word lenght does not exists.
  
 # The output directory will contain two files :
 # - the list of "timestamps delta_timestamps index delta_indexes" to show the progression between each match of good word.
@@ -36,7 +36,7 @@ DIR_DATA="${SCRIPT_DIRECTORY}/data"
 BASENAME_LIST_OF_BASE_TOKEN="base_token.txt"
 PATH_LIST_OF_BASE_TOKEN="${DIR_DATA}/${BASENAME_LIST_OF_BASE_TOKEN}"
 # Data source : https://github.com/dwyl/english-words/blob/master/words_alpha.txt
-BASENAME_DICTIONARY="words_alpha.txt"
+BASENAME_DICTIONARY="dictionary.txt"
 PATH_DICTIONARY="${DIR_DATA}/${BASENAME_DICTIONARY}"
 
 # Control if the result directory exists
@@ -138,14 +138,17 @@ do
 	    ARRAY_PROPOSED_TOKEN_INDEXES_ARRAYS[$a,$c]=$DUMMY_INDEX_FOR_NO_TOKEN
 	done
     fi
-    
+
     # Search silently the proposed word within the dictionary
-    # The represent a string that start by the word, and then a non-char at least once
-    grep --max-count=1 -E "^$WORD[^a-zA-Z]+" "$PATH_DICTIONARY" &>/dev/null
+    # The represent a string that start by the word, and then a non-char at least once or immediately followed by the end of line '$'
+    grep --max-count=1 -E "^$WORD([^a-zA-Z]+|$)" "$PATH_DICTIONARY" &>/dev/null
 
+    # Get the return code of previous command within a variable. Useful for debugging.
+    FLAG_DICTIONARY=$?
+    
     # Conserve the result of the dictionary check within the results array
-    ARRAY_RESULTS_TRUE_FALSE_INT+=($?)
-
+    ARRAY_RESULTS_TRUE_FALSE_INT+=($FLAG_DICTIONARY)
+    
     # Unset the word
     WORD=
 done
@@ -189,8 +192,8 @@ do
 	    NEW_CHUNCK="${MATCHED_WORD:CHUNCK_INDEX_START:CHUNCK_LENGTH}"
 	    # Test if it is already in the enhanced token list.
 	    # Search silently the proposed word within the enhanced token list.
-	    # The represent a string that start by the word, and then a non-char at least once
-	    grep --max-count=1 -E "^${NEW_CHUNCK}$" "$PATH_LIST_OF_ENHANCED_TOKEN" &>/dev/null
+	    # The represent a string that start by the word, and then a non-char at least once or immediately an end of line char '$'.
+	    grep --max-count=1 -E "^${NEW_CHUNCK}([^a-zA-Z]+|$)" "$PATH_LIST_OF_ENHANCED_TOKEN" &>/dev/null
 	    # Test if it not present into the file
 	    if (($?))
 	    then
