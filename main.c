@@ -1,15 +1,36 @@
-#include <stdarg.h>       // va_*
-#include <stdio.h>        // printf
-#include <stdlib.h>       // calloc
-#include <string.h>
+/* Macro */
+#define _POSIX_SOURCE 0
+#define _POSIX_C_SOURCE 200809L
+#define _LARGEFILE_SOURCE
+#define _LARGEFILE64_SOURCE
+#define _FILE_OFFSET_BITS 64
+#define _ISOC11_SOURCE
+#define _GNU_SOURCE
+/* Standard libraries */
+#include <stdarg.h>       /* va_* */
+#include <stdio.h>        /* printf */
+#include <stdlib.h>       /* calloc */
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <time.h>        // time()
-#include <unistd.h>      // sleep()
+#include <time.h>        /* time() */
+#include <unistd.h>      /* sleep() */
+/* Libc libraries */
+#include <dirent.h>
+#include <errno.h> /* Error management */
+#include <fcntl.h>
+#include <grp.h>
+#include <limits.h>
+#include <pwd.h>
+#include <signal.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/times.h>
+#include <termios.h>
 
-//////////////////////////////////////////////////////////////////////
+
+/*//////////////////////////////////////////////////////////////////////
 /////////////////////// PREVIOUS CODE ////////////////////////////////
-//////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////*/
 
 /*
 void read_input(char **ptr_input, int lenght_wished)
@@ -66,7 +87,7 @@ int random_get_from_range(int min, int max)
 
 */
 
-////////////////////////////////////////////////////////////////////
+/*///////////////////////////////////////////////////////////////////*/
 
 /*
 int main()
@@ -152,16 +173,17 @@ int main()
  }
 */
 
-//////////////////////////////////////////////////////////////////////
+/*/////////////////////////////////////////////////////////////////////
 /////////////////////// NEW CODE /////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////*/
 
 
-//////////////////////////////////////////////////////////////////////
+/*/////////////////////////////////////////////////////////////////////
 /////////////////////// FUNCTIONS ////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
-    
-// Count the number of lines within a file.
+/////////////////////////////////////////////////////////////////////*/
+
+
+/* Count the number of lines within a file. */
 int lines_number_get(char *file_path)
 {
   FILE *fptr = fopen(file_path, "r");
@@ -177,7 +199,9 @@ int lines_number_get(char *file_path)
   return lines;
 }
 
-// Get a specific line from a file
+
+
+/* Get a specific line from a file */
 void get_line_content_from_file(char **ptr_input, char * file_path, int line_number, int length)
 {
   int i ;
@@ -210,7 +234,8 @@ void get_line_content_from_file(char **ptr_input, char * file_path, int line_num
   fclose(fptr);
 }
 
-// Get the length of a string.
+
+/* Get the length of a string. */
 size_t strlen(const char *str)
 {
     const char *s;
@@ -218,24 +243,24 @@ size_t strlen(const char *str)
     return(s - str);
 }
 
-// Concatenate a number of 'count' string passed to the function.
+/* Concatenate a number of 'count' string passed to the function. */
 char* concat(int count, ...)
 {
     va_list ap;
     int i;
 
-    // Find required length to store merged string
-    int len = 1; // room for NULL
+    /* Find required length to store merged string */
+    int len = 1; /* room for NULL */
     va_start(ap, count);
     for(i=0 ; i<count ; i++)
         len += strlen(va_arg(ap, char*));
     va_end(ap);
 
-    // Allocate memory to concat strings
+    /* Allocate memory to concat strings */
     char *merged = calloc(sizeof(char),len);
     int null_pos = 0;
 
-    // Actually concatenate strings
+    /* Actually concatenate strings */
     va_start(ap, count);
     for(i=0 ; i<count ; i++)
     {
@@ -248,10 +273,10 @@ char* concat(int count, ...)
     return merged;
 }
 
-// Convert a string to an int array
+/* Convert a string to an int array */
 void convert_string_to_int_array(char **ptr_input, int **ptr_output, int length)
 {
-    int i ; // Used in loop
+    int i ; /* Used in loops */
     int current_char ;
     int current_int ;
     if (*ptr_input == NULL)
@@ -264,32 +289,32 @@ void convert_string_to_int_array(char **ptr_input, int **ptr_output, int length)
     }
     for (i=0 ; i<length; i++) 
     {
-      // If nul char, then fill with 0 the current char and the rest.
+      /* If nul char, then fill with 0 the current char and the rest. */
       if ((*ptr_input)[i] == '\0')
       { (*ptr_output)[i] = 0 ;
-	// Fill the rest of the array with 0 = dummy number
+	/* Fill the rest of the array with 0 = dummy number */
 	for (++i; i<length; i++)
 	{ (*ptr_output)[i] = 0 ; }
 	  break ;
       }
-      // If reached the index of the max_length (=max_length-1)
+      /* If reached the index of the max_length (=max_length-1) */
       else if (i==(length-1))
       { (*ptr_output)[i] = 0 ;
         break ;
       }
-      // Else fill normally with the content of the char casted to int.
+      /* Else fill normally with the content of the char casted to int. */
       else
       { current_char = (*ptr_input)[i] ;
-      // Conversion from char to int here
+	/* Conversion from char to int here */
         current_int = (int)current_char ;
         (*ptr_output)[i] = current_int ;
       }
     }
 }
 
-//////////////////////////////////////////////////////////////////////
+/*////////////////////////////////////////////////////////////////////
 /////////////////////// MAIN CODE ////////////////////////////////////
-//////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////*/
 
 /*
   Enhancements :
@@ -322,44 +347,44 @@ void convert_string_to_int_array(char **ptr_input, int **ptr_output, int length)
 
 int main()
 {
-    // Files
+  /* Files */
     char data_dir[] = "data" ;
     char basename_token[] = "base_token.txt" ;
     char basename_dictionary[] = "dictionary.txt" ;
     char * path_token =  concat(3, data_dir, "/", basename_token) ;
     char * path_dictionary =  concat(3, data_dir, "/", basename_dictionary) ;
     int total_lines_file_token = lines_number_get(path_token) ;
-    //int total_lines_file_dictionary = lines_number_get(path_dictionary) ; // Real data 
-    int total_lines_file_dictionary = 10000 ; // Use for test while developping.
+    /*int total_lines_file_dictionary = lines_number_get(path_dictionary) ; // Real data */ 
+    int total_lines_file_dictionary = 10000 ; /* Use for test while developping.*/
 
-    // Arrays (char, int, array of int)
-    short int word_length = 5 ; // Could be adapted dynamically by getting the longest length of all words from the dictionary.
+    /* Arrays (char, int, array of int) */
+    short int word_length = 5 ; /* Could be adapted dynamically by getting the longest length of all words from the dictionary. */
     char * ptr_char_array = malloc(word_length * sizeof(char)) ;
     int word_max_length = word_length + 1 ;
     int * ptr_int_array = malloc(word_length * sizeof(int)) ;
     int * array_of_array_of_token_int = (int *)malloc(total_lines_file_token * word_max_length * sizeof(int)) ;
     int* array_of_array_of_dictionary_int = (int *)malloc(total_lines_file_dictionary * word_max_length * sizeof(int)) ;
 
-    // Others
-    int i, j ; // used in several loops
+    /* Others */
+    int i, j ; /* used in several loops */
     int current_line ;
     
-    //////////////////// START POINT ////////////////////////
+    /*/////////////////// START POINT ///////////////////////*/
 
     printf("Using a token file of %d lines.\n", total_lines_file_token) ;
     printf("Using a dictionary file of %d lines.\n", total_lines_file_dictionary) ;
     
-    // Read each line of the file
+    /* Read each line of the file */
     for (i=0 ; i<total_lines_file_token ; i++)
     {
       current_line = i+1 ;
-      //get_line_content_from_file(&ptr_char_array, path_token, current_line, word_max_length) ;
+      /* get_line_content_from_file(&ptr_char_array, path_token, current_line, word_max_length) ; */
       get_line_content_from_file(&ptr_char_array, path_token, current_line, word_max_length) ;
-      // DEBUG printf("%d : '%s'\n", current_line, ptr_char_array) ;
-      // Convert the content to int
+      /* DEBUG printf("%d : '%s'\n", current_line, ptr_char_array) ; */
+      /* Convert the content to int */
       convert_string_to_int_array(&ptr_char_array, &ptr_int_array, word_max_length) ;
 
-      // Fill the array of array of ints
+      /* Fill the array of array of ints */
       for (j=0; j<word_max_length; j++)
       { *(array_of_array_of_token_int+i*word_max_length+j) =  ptr_int_array[j] ;
       }
@@ -377,16 +402,16 @@ int main()
     }
 */
 
-    // Read each line of the file
+    /* Read each line of the file */
     for (i=0 ; i<total_lines_file_dictionary ; i++)
     {
       current_line = i+1 ;
       get_line_content_from_file(&ptr_char_array, path_dictionary, current_line, word_max_length) ;
-      // DEBUG printf("%d : '%s'\n", current_line, ptr_char_array) ;
-      // Convert the content to int
+      /* DEBUG printf("%d : '%s'\n", current_line, ptr_char_array) ; */
+      /* Convert the content to int */
       convert_string_to_int_array(&ptr_char_array, &ptr_int_array, word_max_length) ;
 
-      // Fill the array of array of ints
+      /* Fill the array of array of ints */
       for (j=0; j<word_max_length; j++)
       { *(array_of_array_of_dictionary_int+i*word_max_length+j) =  ptr_int_array[j] ;
       }
@@ -404,7 +429,7 @@ int main()
     }
 */
     
-    // Freeing all pointers
+    /* Freeing all pointers */
     printf("Freeing all memory pointer...\n") ; 
     free(path_token) ;
     free(path_dictionary) ;
@@ -413,7 +438,7 @@ int main()
     free(array_of_array_of_token_int) ;
     free(array_of_array_of_dictionary_int) ;
 
-    // Exit message
+    /* Exit message */
     printf("End of main\n") ;
     return 0 ;
 }
