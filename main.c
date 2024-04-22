@@ -12,7 +12,7 @@
 #include <errno.h>        /* Error management */
 #include <fcntl.h>        /* */
 #include <grp.h>          /* */
-#include <libgen.h>       /* (XPG): *note Finding Tokens in a String */
+#include <libgen.h>       /* Finding Tokens in a String */
 #include <limits.h>       /* */
 #include <pwd.h>          /* */
 #include <signal.h>       /* */
@@ -29,6 +29,10 @@
 /* Other libraries */
 #include <stdarg.h>       /* va_* */
 #include <stdbool.h>      /* boolean type 'bool' */
+
+/**************************************************
+***************************************************
+**************************************************/
 
 /* Functions */
 
@@ -187,9 +191,131 @@ int directory_test_if_exists_or_create_with_error_management(char * directory_pa
     }
 }
 
-/*////////////////////////////////////////////////////////////////////
-/////////////////////// MAIN CODE ////////////////////////////////////
-////////////////////////////////////////////////////////////////////*/
+/* Control if the file exists, delete it if so. */
+int file_test_if_exists_and_remove_with_error_management(char * path_file)
+{
+  /* Control if the file exists. */
+  if (file_exists(path_file) == 1)
+    { /* Remove it if so and check if it was well done - exit with error else. */
+      if (remove(path_file) != 0)
+      { char * error_rm_file = concat(3, ": remove(", path_file, ") error ") ;
+	print_error_to_stderr(errno, error_rm_file) ;
+	exit(EXIT_FAILURE) ;
+      }
+    }
+}
+
+/* Write an input to a file with a backline char at the end '\n' */
+void write_input_to_file(char *ptr_input, char *file_path)
+{    
+    /* Check whether the pointer is not null. */
+    if (ptr_input == NULL)
+    { printf("ERROR : a nul pointer was provided to the function.\n") ;
+      return ;
+    }
+    /* Append the content of the input to the file. */
+    FILE *fptr = fopen(file_path, "a") ;
+    int i = 0 ; /* For loops */
+    while (ptr_input[i] != '\0')
+      { fputc(ptr_input[i], fptr) ;
+	i++ ;
+      }
+    /* Add backline at the end. */
+    fprintf(fptr, "\n") ;
+    fclose(fptr); 
+}
+
+/* Copy a file to another with error management */
+/* Source : https://stackoverflow.com/questions/2180079/how-can-i-copy-a-file-on-unix-using-c */
+int copy_a_file_to_another_with_error_management(const char *from, const char *to)
+{
+  /* File descriptors */
+  int fd_to, fd_from;
+  /* Buffer size set for efficiency */
+  char buf[4096];
+  /* Counting the number of bytes copied */
+  ssize_t nread;
+  /* For saving potential error */
+  int saved_errno;
+  
+  /* Try to open file descriptor for copied file */
+  fd_from = open(from, O_RDONLY);
+  if (fd_from < 0)
+    goto out_error;
+
+  /* Try to open file descriptor for copy file. */
+  fd_to = open(to, O_WRONLY | O_CREAT | O_EXCL, 0666);
+  if (fd_to < 0)
+    goto out_error;
+    
+  /* While there is still something to read from the file descriptor of the copied file */
+  while (nread = read(fd_from, buf, sizeof buf), nread > 0)
+    {
+      /* Set the output pointer to the buffer */
+      char *out_ptr = buf;
+      /* Conserve the number of bytes written */
+      ssize_t nwritten;
+      
+      /* Loop until there is nothing else to read. */
+      do
+	{
+	  nwritten = write(fd_to, out_ptr, nread);
+
+	  /* If the number of written bytes is greater than 0. */
+	  if (nwritten >= 0)
+            {
+	      /* Reduce the number of bytes to read. */
+	      nread -= nwritten;
+	      /* Move the ptr of the number of written bytes */
+	      out_ptr += nwritten;
+            }
+	  /* Else ...*/
+	  else if (errno != EINTR)
+	    {
+	      goto out_error;
+	    }
+	} while (nread > 0);
+    }
+
+    /* If nothing else is to be read */
+    if (nread == 0)
+    {
+      /* Test to close the file descriptor of the copy file */
+        if (close(fd_to) < 0)
+        {
+            fd_to = -1;
+            goto out_error;
+        }
+	/* Close the file descriptor of the copied file */
+        close(fd_from);
+
+        /* Success! */
+        return 0;
+    }
+
+ /* Manage error */
+ out_error:
+    saved_errno = errno;
+
+    /* Close the file descriptor of copied file */
+    close(fd_from);
+    /* If it exists, close the file descriptor of the copy file */
+    if (fd_to >= 0)
+        close(fd_to);
+    
+    /* Print error message and exit */
+    char * error_cp_file = concat(5, ": copy \"", from, "\" to \"", to, "\" failed ") ;
+    print_error_to_stderr(saved_errno, error_cp_file) ;
+    /* Exit with error if could not create it. */
+    exit(EXIT_FAILURE) ; 
+}
+
+/**************************************************
+***************************************************
+***************************************************
+**************************************************/
+
+/* MAIN CODE */
 
 /*
   Enhancements :
@@ -225,22 +351,34 @@ int directory_test_if_exists_or_create_with_error_management(char * directory_pa
       - Exit code incrementation.
       - Use as much as possible array of int.
       - Anaylse results, optimize model.
-
+      - Add capital letter support
+      - Add 'special' character support '.,-_ ...'
 */
 
 int main(int argc, char **argv)
 {
-  /* Get the main directory : the one where this script is. */
-  char * script_path = argv[0] ;
-  char * script_directory = dirname(script_path) ;
-  char * absolute_path_script_directory = canonicalize_file_name(script_directory) ;
-  
-  /* Main indicators to set the model */
+    /* Main indicators to set the model */
   int number_of_wished_proposed_results = 1000 ; /* Number of index within the array of proposed results. */
   int average_word_length = 4 ;
   int variation_max_word_size = 2 ;
   /* The randomly size of the word will be set in the range "1 <-> AVERAGE_WORD_LENGHT+VARIATION" or "LENGTH_MIN_WORD <-> AVERAGE_WORD_LENGHT+VARIATION" if the lenght min. is greater than 1. Cannot be lower than 1 : 0 word lenght does not exists. */
 
+  /* General variables */
+  int i ; /* For loops */
+  
+  /* Get the main directory : the one where this script is. */
+  char * script_path = argv[0] ;
+  char * script_directory = dirname(script_path) ;
+  char * absolute_path_script_directory = canonicalize_file_name(script_directory) ;
+
+  /* Data */
+  char * basename_dir_data = "data" ;
+  char * path_dir_data = concat(3, absolute_path_script_directory, "/", basename_dir_data) ;
+  char * basename_list_of_base_token = "base_token.txt" ;
+  char * path_list_of_base_token = concat(3, path_dir_data, "/", basename_list_of_base_token) ;
+  char * basename_dictionary = "dictionary.txt" ; /* Source : https://github.com/dwyl/english-words/blob/master/words_alpha.txt */
+  char * path_dictionary = concat(3, path_dir_data, "/", basename_dictionary) ;
+  
   /* Outputs */
   char * basename_dir_results = "output" ;
   char * path_dir_results = concat(3, absolute_path_script_directory, "/", basename_dir_results) ;
@@ -251,55 +389,48 @@ int main(int argc, char **argv)
   char * basename_dummy_file_to_receive_signal_to_show_that_command_is_finished = "dummy_file_to_receive_signal_to_show_that_command_is_finished.txt" ;
   char * path_dummy_file_to_receive_signal_to_show_that_command_is_finished = concat(3, path_dir_results, "/", basename_dummy_file_to_receive_signal_to_show_that_command_is_finished) ;
 
-  /* Data */
-  char * basename_dir_data = "data" ;
-  char * path_dir_data = concat(3, absolute_path_script_directory, "/", basename_dir_data) ;
-  char * basename_list_of_base_token = "base_token.txt" ;
-  char * path_list_of_base_token = concat(3, path_dir_data, "/", basename_list_of_base_token) ;
-  char * basename_dictionary = "dictionary.txt" ; /* Source : https://github.com/dwyl/english-words/blob/master/words_alpha.txt */
-  char * path_dictionary = concat(3, path_dir_data, "/", basename_dictionary) ;
-
   /* Test whether directories exist, else test to create them, it no successfull, exit with failure code. */
   directory_test_if_exists_or_create_with_error_management(path_dir_results) ;
   directory_test_if_exists_or_create_with_error_management(path_dir_data) ;
 
-  return 0 ;
+  /* Test whether the file already exists and remove it if so. Will be re-created from scratch. */
+  file_test_if_exists_and_remove_with_error_management(path_list_of_base_token) ; 
+
+  /* Fill the token array and add each token to the base token file. */
+  char array_of_base_token[100] ;
+  int number_of_base_token = 26 ;
+  char current_char = 'a' ;
+  for (i=0; i<number_of_base_token; i++)
+    { /* New cleared (calloc) memory space for the char */
+      char * ptr_char = (char *) calloc(2, sizeof(char)) ; /* 2 : for the '\0' at the end of the string */
+      *ptr_char = current_char ;
+      array_of_base_token[i] = current_char ;
+      /* Write the char to the base token file */
+      write_input_to_file(ptr_char, path_list_of_base_token) ;
+      /* Change the char at each loop */
+      current_char++ ;
+      /* Free memory for next loop */
+      free(ptr_char) ; 
+    }
+
+  /* If the enhanced token file does not exists and copy the base token to it. */
+  if (file_exists(path_list_of_enhanced_token) == 0)
+    { copy_a_file_to_another_with_error_management(path_list_of_base_token, path_list_of_enhanced_token) ;
+    }
+
+  /* Set the path of base token to the enhanced ones. */
+  char * path_list_of_current_token_used = path_list_of_enhanced_token ;
+
+  /* Printing a message before leaving script with sucess code */
+  printf("\nEnd of script.\n") ;
+  return EXIT_SUCCESS ;
 }
 
+/**************************************************
+***************************************************
+**************************************************/
 
-/*/////////////////////////////////////////////////////////////////////*/
-
-/* BASH CODE
- 
-# If the based token file exists
-if [  -f  "$PATH_LIST_OF_BASE_TOKEN" ]
-then
-    # Remove it.
-    rm -rf "$PATH_LIST_OF_BASE_TOKEN" ||
-    { STDERR_show_message "\nERROR : could not remove the existent file \"$BASENAME_LIST_OF_BASE_TOKEN\" located \"$PATH_LIST_OF_BASE_TOKEN\".\n"
-      exit 2
-    }
-fi
-
-# Fill the token array.
-# Could add also the majuscule for at the beginning of the word
-declare -a ARRAY_TOKEN
-for EACH_LETTER in {a..z} #{A..Z}
-do
-    ARRAY_TOKEN+=("$EACH_LETTER")
-    # Add each base token to a file.
-    echo "$EACH_LETTER" >> "$PATH_LIST_OF_BASE_TOKEN"
-done
-
-# If the enhanced token file does not exists
-if [ ! -f  "$PATH_LIST_OF_ENHANCED_TOKEN" ]
-then
-    # Copy the base token to it.
-    cp "$PATH_LIST_OF_BASE_TOKEN" "$PATH_LIST_OF_ENHANCED_TOKEN"
-fi
-
-# Set the path of base token to the enhanced ones.
-PATH_LIST_OF_BASE_TOKEN="$PATH_LIST_OF_ENHANCED_TOKEN"
+/* BASH CODE REMAINING FOR THE TRANSLATION FROM BASH TO C
 
 # Update the number of token and therefore the maximum index available by counting the lines of the file.
 # As it can increase from a run to another, it is important to do it in order to enjoy the new token chunch as available token.
@@ -459,52 +590,11 @@ exit 0
 
 */ /* END OF BASH CODE */
 
+/**************************************************
+***************************************************
+**************************************************/
 
-
-
-/* ///////////////////////////////////////////////////////// */
-
-
-
-/* OLD C CODE */
-/* DEBUG
-    // Print its content
-    for (i=0; i<total_lines_file_token; i++)
-    {
-      printf("Content of array %d\n", i) ;
-      for (j=0; j<word_max_length; j++)
-	{ printf("Index %d : value %d\n", j, *(array_of_array_of_token_int + i*word_max_length + j)) ;
-      }
-      printf("\n") ; // Esthetic
-    }
-*/
-
-/* DEBUG
-    // Print its content
-    for (i=0; i<total_lines_file_dictionary; i++)
-    {
-      printf("Content of array %d\n", i) ;
-      for (j=0; j<word_max_length; j++)
-	{ printf("Index %d : value %d\n", j, *(array_of_array_of_dictionary_int + i*word_max_length + j)) ;
-      }
-      printf("\n") ; // Esthetic
-    }
-*/
-
-/*//////////////////////////////////////////////////////////////////////
-/////////////////////// PREVIOUS CODE ////////////////////////////////
-/////////////////////////////////////////////////////////////////////*/
-
-/* Get the length of a string. */
-/* This function is defined in string.h (libc) so no need for it. */
-/*
-size_t strlen(const char *str)
-{
-    const char *s;
-    for (s = str; *s; ++s);
-    return(s - str);
-}
-*/
+/* OLD : C FUNCTIONS USED IN PRECEDENT VERSION OF CODE */
 
 /*
 void read_input(char **ptr_input, int lenght_wished)
@@ -528,43 +618,32 @@ void read_input(char **ptr_input, int lenght_wished)
       }
     }
 }
+*/
 
+/*
 void empty_file(char *file_path)
 {
     FILE *fptr = fopen(file_path, "w") ;
     fclose(fptr); 
 }
 
-void write_input_to_file(char **ptr_input, char *file_path)
-{
-    int i = 0 ;
-    if (*ptr_input == NULL)
-    {  printf("ERROR : a nul pointer was provided to the function.\n") ;
-        return ;
-    }
+*/
 
-    FILE *fptr = fopen(file_path, "a") ;
-    while ((*ptr_input)[i] != '\0')
-    {
-      fputc((*ptr_input)[i], fptr) ;
-      i++ ;
-    }
-    fprintf(fptr, "\n") ;
-    fclose(fptr); 
-}
-
+/*
 int random_get_from_range(int min, int max)
 {
   int random_number = min + rand() / (RAND_MAX / (max - min + 1) + 1) ;
   return random_number ;
 }
-
 */
 
-/*///////////////////////////////////////////////////////////////////*/
+/**************************************************
+***************************************************
+**************************************************/
+
+/* OLD : PRECEDENT VERSION OF CODE 1 = MORE RECENT */
 
 /*
-
 int main()
 {
     char data_dir[] = "data" ;
@@ -605,11 +684,29 @@ int main()
       get_line_content_from_file(&ptr_char_array, path_dictionary, current_line, word_max_length) ;
       convert_string_to_int_array(&ptr_char_array, &ptr_int_array, word_max_length) ;
 
+    for (i=0; i<total_lines_file_token; i++)
+    {
+      printf("Content of array %d\n", i) ;
       for (j=0; j<word_max_length; j++)
+	{ printf("Index %d : value %d\n", j, *(array_of_array_of_token_int + i*word_max_length + j)) ;
+      }
+      printf("\n") ;
+    }
+      
+    for (j=0; j<word_max_length; j++)
       { *(array_of_array_of_dictionary_int+i*word_max_length+j) =  ptr_int_array[j] ;
       }
     }
-    
+
+    for (i=0; i<total_lines_file_dictionary; i++)
+    {
+      printf("Content of array %d\n", i) ;
+      for (j=0; j<word_max_length; j++)
+	{ printf("Index %d : value %d\n", j, *(array_of_array_of_dictionary_int + i*word_max_length + j)) ;
+      }
+      printf("\n") ;
+    }
+
     printf("Freeing all memory pointer...\n") ; 
     free(path_token) ;
     free(path_dictionary) ;
@@ -624,15 +721,17 @@ int main()
 
 */
 
-/*/////////////////////////////////////////////////////////////////////////*/
+/**************************************************
+***************************************************
+**************************************************/
+
+/* OLD : PRECEDENT VERSION OF CODE 2 = LESS RECENT */
 
 /*
 int main()
 {
-    // Link seed to the time to get ALWAYS different results.
-    srand(time(NULL)) ;
-  
-    int i ; // used in several loops
+    srand(time(NULL)) ; 
+    int i ; 
     int length = 100 ;
     char input_from_user[length] ;
     char data_dir[] = "data" ;
@@ -641,31 +740,23 @@ int main()
     char * ptr_input ;
     ptr_input = input_from_user ;
     FILE *fptr;
-*/
-
-/*
-    // Test whether the data directory exists and create it else.
+    
     struct stat st = {0};
     if (stat(data_dir, &st) == -1)
       { printf("Creation of the directory %s.\n", data_dir) ;
         mkdir(data_dir, 0777); }
     else
       { printf("The directory \"%s\" already exists.\n", data_dir) ; }
-    */
 
-    /*
-    // Optional : Empty file
     empty_file(file_path) ;
 
-    // Get inputs from user
     for (i=0 ; i<5; i++)
     {
         read_input(&ptr_input, length) ;
         printf("Input provided : '%s'\n", input_from_user) ;
         write_input_to_file(&ptr_input, file_path) ;
     }
-*/
-/*    
+
     int lines = lines_number_get(file_path) ;
     int minimum_number = 1 ;
     int max_number_of_outputs = 10 ;
@@ -673,7 +764,6 @@ int main()
     char * new_output ;
     char * current_output ; 
     char * final_output ;
-    // Define here the special char that can be separators.
     char* special_char_list = " " ;
     int special_char_list_length = strlen(special_char_list) ;
     int random_index_special_char ; 
@@ -681,16 +771,13 @@ int main()
     int rand_number ;
     int new_output_length ;
 
-    // Define current_output
     current_output = "" ;
     
-    // Get outputs
     for (i=0 ; i<number_of_random_outputs_to_get; i++)
     {
         rand_number = random_get_from_range(minimum_number, lines) ;
         new_output = get_line_content_from_file(file_path, rand_number, length) ;
 	new_output_length = strlen(new_output) ;
-	// Replace the separator '\n' by a special char defined in the above list.
 	if (new_output[new_output_length-1] == '\n')
         {
 	  random_index_special_char = random_get_from_range(0, special_char_list_length) ;
@@ -698,13 +785,10 @@ int main()
 	  new_output[new_output_length-1] = random_special_char ;
 	}
 
-	// Concatenate current output with new output
 	final_output = concat(2, current_output, new_output) ;
-	// Set current output to (new) final_output
 	current_output = final_output ;
     }
 
-    // Print output
     printf("Output produced : '%s'\n", final_output) ;
     
     return 0 ;
