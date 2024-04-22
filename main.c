@@ -6,29 +6,38 @@
 #define _FILE_OFFSET_BITS 64
 #define _ISOC11_SOURCE
 #define _GNU_SOURCE
-/* Standard libraries */
-#include <stdarg.h>       /* va_* */
+
+/* Libc libraries */
+#include <dirent.h>       /* */
+#include <errno.h>        /* Error management */
+#include <fcntl.h>        /* */
+#include <grp.h>          /* */
+#include <libgen.h>       /* (XPG): *note Finding Tokens in a String */
+#include <limits.h>       /* */
+#include <pwd.h>          /* */
+#include <signal.h>       /* */
 #include <stdio.h>        /* printf */
 #include <stdlib.h>       /* calloc */
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <time.h>        /* time() */
-#include <unistd.h>      /* sleep() */
-/* Libc libraries */
-#include <dirent.h>
-#include <errno.h> /* Error management */
-#include <fcntl.h>
-#include <grp.h>
-#include <libgen.h> /* (XPG): *note Finding Tokens in a String */
-#include <limits.h>
-#include <pwd.h>
-#include <signal.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <sys/times.h>
-#include <termios.h>
+#include <string.h>       /* */
+#include <sys/stat.h>     /* File mode */
+#include <sys/times.h>    /* */
+#include <sys/types.h>    /* */
+#include <termios.h>      /* */
+#include <time.h>         /* time() */
+#include <unistd.h>       /* sleep() */
 
-/* FUNCTIONS */
+/* Other libraries */
+#include <stdarg.h>       /* va_* */
+#include <stdbool.h>      /* boolean type 'bool' */
+
+/* Functions */
+
+/* Test whether a file exists */
+bool file_exists(char *filename)
+{
+  struct stat buffer;   
+  return (stat (filename, &buffer) == 0);
+}
 
 /* Count the number of lines within a file. */
 int lines_number_get(char *file_path)
@@ -79,16 +88,8 @@ void get_line_content_from_file(char **ptr_input, char * file_path, int line_num
   fclose(fptr);
 }
 
-/* Get the length of a string. */
-size_t strlen(const char *str)
-{
-    const char *s;
-    for (s = str; *s; ++s);
-    return(s - str);
-}
-
 /* Concatenate a number of 'count' string passed to the function. */
-char* concat(int count, ...)
+char * concat(int count, ...)
 {
     va_list ap;
     int i;
@@ -156,6 +157,36 @@ void convert_string_to_int_array(char **ptr_input, int **ptr_output, int length)
     }
 }
 
+/* From the errno, and any additional message, print an error message to stderr */
+void print_error_to_stderr(int error_code, char * error_message_other)
+{ char * error_message_head = "ERROR:" ;
+  char * error_message_specific = strerror(errno) ;
+  if(strlen(error_message_other) >= 1)
+    { char * error_message_all = concat(5, error_message_head, " ", error_message_specific, " ", error_message_other) ;
+     perror(error_message_all) ;
+    }
+  else
+    { char * error_message_all = concat(3, error_message_head, " ", error_message_specific) ;
+      perror(error_message_all) ;
+    }
+}
+
+int directory_test_if_exists_or_create_with_error_management(char * directory_path)
+{
+  /* Control if the result directory does not exists, create it else */
+  if (file_exists(directory_path) == 0)
+    { char * error_no_such_dir = concat(3, ": \"", directory_path, "\" - creating it... ") ;
+      print_error_to_stderr(errno, error_no_such_dir) ;
+      /* Test whether creation was well performed and print error message else. */
+      if (mkdir(directory_path, 0755) != 0)
+	{ char * error_mkdir = concat(3, ": mkdir(", directory_path, ") error ") ;
+	  print_error_to_stderr(errno, error_mkdir) ;
+	  /* Exit with error if could not create it. */
+	  exit(EXIT_FAILURE) ; 
+	}
+    }
+}
+
 /*////////////////////////////////////////////////////////////////////
 /////////////////////// MAIN CODE ////////////////////////////////////
 ////////////////////////////////////////////////////////////////////*/
@@ -199,7 +230,6 @@ void convert_string_to_int_array(char **ptr_input, int **ptr_output, int length)
 
 int main(int argc, char **argv)
 {
-
   /* Get the main directory : the one where this script is. */
   char * script_path = argv[0] ;
   char * script_directory = dirname(script_path) ;
@@ -208,7 +238,8 @@ int main(int argc, char **argv)
   /* Main indicators to set the model */
   int number_of_wished_proposed_results = 1000 ; /* Number of index within the array of proposed results. */
   int average_word_length = 4 ;
-  int variation_max_word_size = 2 ; /* The randomly size of the word will be set in the range "1 <-> AVERAGE_WORD_LENGHT+VARIATION" or "LENGTH_MIN_WORD <-> AVERAGE_WORD_LENGHT+VARIATION" if the lenght min. is greater than 1. Cannot be lower than 1 : 0 word lenght does not exists. */
+  int variation_max_word_size = 2 ;
+  /* The randomly size of the word will be set in the range "1 <-> AVERAGE_WORD_LENGHT+VARIATION" or "LENGTH_MIN_WORD <-> AVERAGE_WORD_LENGHT+VARIATION" if the lenght min. is greater than 1. Cannot be lower than 1 : 0 word lenght does not exists. */
 
   /* Outputs */
   char * basename_dir_results = "output" ;
@@ -220,41 +251,26 @@ int main(int argc, char **argv)
   char * basename_dummy_file_to_receive_signal_to_show_that_command_is_finished = "dummy_file_to_receive_signal_to_show_that_command_is_finished.txt" ;
   char * path_dummy_file_to_receive_signal_to_show_that_command_is_finished = concat(3, path_dir_results, "/", basename_dummy_file_to_receive_signal_to_show_that_command_is_finished) ;
 
-
-  printf("DEBUG path_dir_results = %s\n", path_dir_results) ;
-  printf("DEBUG path_list_deltas_timestamps_and_indexes_between_good_results = %s\n", path_list_deltas_timestamps_and_indexes_between_good_results) ;
-  printf("DEBUG path_list_of_enhanced_token = %s\n", path_list_of_enhanced_token) ;
-  printf("DEBUG path_dummy_file_to_receive_signal_to_show_that_command_is_finished = %s\n", path_dummy_file_to_receive_signal_to_show_that_command_is_finished) ;
-
   /* Data */
-/*
-# The data directory contains a list of base token that will be created by the script itself..
-DIR_DATA="${SCRIPT_DIRECTORY}/data"
-BASENAME_LIST_OF_BASE_TOKEN="base_token.txt"
-PATH_LIST_OF_BASE_TOKEN="${DIR_DATA}/${BASENAME_LIST_OF_BASE_TOKEN}"
-# Data source : https://github.com/dwyl/english-words/blob/master/words_alpha.txt
-BASENAME_DICTIONARY="dictionary.txt"
-PATH_DICTIONARY="${DIR_DATA}/${BASENAME_DICTIONARY}"
-   */
+  char * basename_dir_data = "data" ;
+  char * path_dir_data = concat(3, absolute_path_script_directory, "/", basename_dir_data) ;
+  char * basename_list_of_base_token = "base_token.txt" ;
+  char * path_list_of_base_token = concat(3, path_dir_data, "/", basename_list_of_base_token) ;
+  char * basename_dictionary = "dictionary.txt" ; /* Source : https://github.com/dwyl/english-words/blob/master/words_alpha.txt */
+  char * path_dictionary = concat(3, path_dir_data, "/", basename_dictionary) ;
+
+  /* Test whether directories exist, else test to create them, it no successfull, exit with failure code. */
+  directory_test_if_exists_or_create_with_error_management(path_dir_results) ;
+  directory_test_if_exists_or_create_with_error_management(path_dir_data) ;
 
   return 0 ;
 }
+
+
+/*/////////////////////////////////////////////////////////////////////*/
+
 /* BASH CODE
  
-# Control if the result directory exists
-if [ ! -d "$DIR_RESULTS" ]
-then
-    # Create it else
-    mkdir -p "$DIR_RESULTS"
-fi
-
-# Control if the data directory exists
-if  [ ! -d "$DIR_DATA" ]
-then
-    STDERR_show_message "\nERROR : there is no data directory at the path of DIR_RESULTS : \"$DIR_DATA\". \nPlease create it and import into your data before re-running this script $(basename $0) located \"$SCRIPT_DIRECTORY\".\n"
-    exit 1
-fi
-
 # If the based token file exists
 if [  -f  "$PATH_LIST_OF_BASE_TOKEN" ]
 then
@@ -443,7 +459,12 @@ exit 0
 
 */ /* END OF BASH CODE */
 
+
+
+
 /* ///////////////////////////////////////////////////////// */
+
+
 
 /* OLD C CODE */
 /* DEBUG
@@ -473,6 +494,17 @@ exit 0
 /*//////////////////////////////////////////////////////////////////////
 /////////////////////// PREVIOUS CODE ////////////////////////////////
 /////////////////////////////////////////////////////////////////////*/
+
+/* Get the length of a string. */
+/* This function is defined in string.h (libc) so no need for it. */
+/*
+size_t strlen(const char *str)
+{
+    const char *s;
+    for (s = str; *s; ++s);
+    return(s - str);
+}
+*/
 
 /*
 void read_input(char **ptr_input, int lenght_wished)
@@ -566,7 +598,7 @@ int main()
       { *(array_of_array_of_token_int+i*word_max_length+j) =  ptr_int_array[j] ;
       }
     }
-
+'''
     for (i=0 ; i<total_lines_file_dictionary ; i++)
     {
       current_line = i+1 ;
