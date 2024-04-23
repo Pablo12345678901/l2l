@@ -353,6 +353,8 @@ int copy_a_file_to_another_with_error_management(const char *from, const char *t
       - Anaylse results, optimize model.
       - Add capital letter support
       - Add 'special' character support '.,-_ ...'
+      - Use least memory by replacing int with short.
+      - Compute dynamically the word max length of the dictionary words.
 */
 
 int main(int argc, char **argv)
@@ -362,7 +364,8 @@ int main(int argc, char **argv)
   int average_word_length = 4 ;
   int variation_max_word_size = 2 ;
   /* The randomly size of the word will be set in the range "1 <-> AVERAGE_WORD_LENGHT+VARIATION" or "LENGTH_MIN_WORD <-> AVERAGE_WORD_LENGHT+VARIATION" if the lenght min. is greater than 1. Cannot be lower than 1 : 0 word lenght does not exists. */
-
+  int length_max_word_dictionary = 30 ;
+  
   /* General variables */
   int i ; /* For loops */
   
@@ -421,6 +424,47 @@ int main(int argc, char **argv)
   /* Set the path of base token to the enhanced ones. */
   char * path_list_of_current_token_used = path_list_of_enhanced_token ;
 
+  /* Setting the token range : 0 to NUMBER_OF_TOKEN, with :
+     0 = dummy token = no token
+     1 = first token
+     NUMBER_OF_TOKEN = last token. */
+  /* Update the number of token and therefore the maximum index available by counting the lines of the file.
+     As it can increase from a run to another, it is important to do it in order to enjoy the new token chunch as available token. */
+  int number_of_token = lines_number_get(path_list_of_current_token_used) ;
+  int index_max_token = number_of_token ; 
+  /* Set the dummy index for empty letter in a word as index 0*/
+  int dummy_index_for_no_token = 0 ;
+
+  /* Set the range between which the each word length will be randomly choosed */
+  /* Set the mininum */
+  int length_min_word = average_word_length - variation_max_word_size ;
+  /* Avoid getting a word lenght of 0, always minimum lenght >=1 */
+
+  if (average_word_length < 1)
+    { /* If < 1 : set to 1 */
+      length_min_word = 1 ;
+    }
+  /* Set the maximum */
+  int length_max_word = average_word_length + variation_max_word_size ;
+  
+  /* Declare a two dimension array that will contains the list of array of proposed indexes (that can be translated to a list of words). */
+  int * array_of_array_of_proposed_token_int = (int *)malloc(number_of_wished_proposed_results * length_max_word * sizeof(int)) ;
+  /* Same for current dictionary words */
+  int number_of_dictionary_words = lines_number_get(path_dictionary) ;
+  int* array_of_array_of_dictionary_words_int = (int *)malloc(number_of_dictionary_words * length_max_word_dictionary * sizeof(int)) ;
+
+  
+  /* CURRENTLY IN DEV
+     Test the filling of the two arrays above.
+     Write and read.
+  */
+
+
+
+
+
+
+    
   /* Printing a message before leaving script with sucess code */
   printf("\nEnd of script.\n") ;
   return EXIT_SUCCESS ;
@@ -432,36 +476,8 @@ int main(int argc, char **argv)
 
 /* BASH CODE REMAINING FOR THE TRANSLATION FROM BASH TO C
 
-# Update the number of token and therefore the maximum index available by counting the lines of the file.
-# As it can increase from a run to another, it is important to do it in order to enjoy the new token chunch as available token.
-NUMBER_OF_TOKEN="$(cat $PATH_LIST_OF_BASE_TOKEN | wc -l)"
-INDEX_MAX_TOKEN=$((NUMBER_OF_TOKEN-1))
-
-# Set the dummy index for empty letter in a word as index_max + 1
-# Could be enhanced to be set to 0).
-DUMMY_INDEX_FOR_NO_TOKEN=$((INDEX_MAX_TOKEN+1))
-
-# Set the range between which the each word lenght will be randomly choosed
-# Set the mininum
-# Avoid getting a word lenght of 0, always minimum lenght >=1
-if [ $((AVERAGE_WORD_LENGTH-VARIATION_MAX_WORD_SIZE)) -lt 1 ]
-then
-    # If < 1 : set to 1
-    LENGHT_MIN_WORD=1
-else
-    # Else, set normally
-    LENGTH_MIN_WORD=$((AVERAGE_WORD_LENGTH-VARIATION_MAX_WORD_SIZE))
-fi
-# Set the maximum
-LENGTH_MAX_WORD=$((AVERAGE_WORD_LENGTH+VARIATION_MAX_WORD_SIZE))
-
-# Declare a two dimension array that will contains the list of array of proposed indexes (that can be translated to a list of words).
-declare -A ARRAY_PROPOSED_TOKEN_INDEXES_ARRAYS
-X_DIMENSION_SIZE=$NUMBER_OF_WISHED_PROPOSED_RESULTS
-Y_DIMENSION_SIZE=$LENGTH_MAX_WORD
 
 declare -a ARRAY_RESULTS_TRUE_FALSE_INT
-
 # Loop to produce the results
 for ((a=0; a<$NUMBER_OF_WISHED_PROPOSED_RESULTS; a++))
 do
