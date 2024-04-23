@@ -18,7 +18,7 @@ SCRIPT_DIRECTORY="$(dirname -- "${BASH_SOURCE[0]}")"
 # Main indicators to set the model
 NUMBER_OF_WISHED_PROPOSED_RESULTS=1000 # Number of index within the array of proposed results.
 AVERAGE_WORD_LENGTH=4
-VARIATION_MAX_WORD_SIZE=2 # The randomly size of the word will be set in the range "1 <-> AVERAGE_WORD_LENGHT+VARIATION" or "LENGTH_MIN_WORD <-> AVERAGE_WORD_LENGHT+VARIATION" if the lenght min. is greater than 1. Cannot be lower than 1 : 0 word lenght does not exists.
+VARIATION_MAX_WORD_SIZE=2 # The randomly size of the word will be set in the range "1 <-> AVERAGE_WORD_LENGTH+VARIATION" or "LENGTH_MIN_WORD <-> AVERAGE_WORD_LENGTH+VARIATION" if the lenght min. is greater than 1. Cannot be lower than 1 : 0 word lenght does not exists.
  
 # The output directory will contain two files :
 # - the list of "timestamps delta_timestamps index delta_indexes" to show the progression between each match of good word.
@@ -98,7 +98,7 @@ DUMMY_INDEX_FOR_NO_TOKEN=$((INDEX_MAX_TOKEN+1))
 if [ $((AVERAGE_WORD_LENGTH-VARIATION_MAX_WORD_SIZE)) -lt 1 ]
 then
     # If < 1 : set to 1
-    LENGHT_MIN_WORD=1
+    LENGTH_MIN_WORD=1
 else
     # Else, set normally
     LENGTH_MIN_WORD=$((AVERAGE_WORD_LENGTH-VARIATION_MAX_WORD_SIZE))
