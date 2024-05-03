@@ -364,7 +364,10 @@ int main(int argc, char **argv)
   int average_word_length = 4 ;
   int variation_max_word_size = 2 ;
   /* The randomly size of the word will be set in the range "1 <-> AVERAGE_WORD_LENGHT+VARIATION" or "LENGTH_MIN_WORD <-> AVERAGE_WORD_LENGHT+VARIATION" if the lenght min. is greater than 1. Cannot be lower than 1 : 0 word lenght does not exists. */
-  int length_max_word_dictionary = 30 ;
+  int real_length_max_word_dictionary = 30 ; 
+  int length_max_word_dictionary = real_length_max_word_dictionary + 1 ; /* +1 for the char ptr that needs to end with '\0' */
+  /* For future check that the file contains at least X lines = words */
+  int minimum_number_of_lines_required_for_dictionary_file = 10 ; 
   
   /* General variables */
   int i ; /* For loops */
@@ -395,9 +398,9 @@ int main(int argc, char **argv)
   /* Test whether directories exist, else test to create them, it no successfull, exit with failure code. */
   directory_test_if_exists_or_create_with_error_management(path_dir_results) ;
   directory_test_if_exists_or_create_with_error_management(path_dir_data) ;
-
+  
   /* Test whether the file already exists and remove it if so. Will be re-created from scratch. */
-  file_test_if_exists_and_remove_with_error_management(path_list_of_base_token) ; 
+  file_test_if_exists_and_remove_with_error_management(path_list_of_base_token) ;
 
   /* Fill the token array and add each token to the base token file. */
   char array_of_base_token[100] ;
@@ -449,22 +452,56 @@ int main(int argc, char **argv)
   
   /* Declare a two dimension array that will contains the list of array of proposed indexes (that can be translated to a list of words). */
   int * array_of_array_of_proposed_token_int = (int *)malloc(number_of_wished_proposed_results * length_max_word * sizeof(int)) ;
-  /* Same for current dictionary words */
+
+  /* Test wheter the dictionary file exists, else exit with error */
+  if (file_exists(path_dictionary)==0)
+    { printf("\nERROR : there is no dictionary file at the path \"%s\". \nPlease create it.\n\n", path_dictionary) ;
+      exit(EXIT_FAILURE) ; 
+    }
+
+  /* Test that it contains at least 10 words = lines, else exit with error  */
   int number_of_dictionary_words = lines_number_get(path_dictionary) ;
+  if (number_of_dictionary_words<minimum_number_of_lines_required_for_dictionary_file)
+    { printf("\nERROR : the dictionary file has to contain at least %d words = lines. \nCurrently, it contains %d. \nPlease replace it or fill it correctly.\n\n", minimum_number_of_lines_required_for_dictionary_file, number_of_dictionary_words) ;
+      exit(EXIT_FAILURE) ; 
+  }
+
+  /* Declare a two dimension array that will contains the list of array of proposed indexes (that can be translated to a list of words). */
   int* array_of_array_of_dictionary_words_int = (int *)malloc(number_of_dictionary_words * length_max_word_dictionary * sizeof(int)) ;
 
+  /* Fill the array of dictionary words with each letter converted to an int and if there is no more letter, fill it with a dummy token = 0 */ 
+  int word ;
+  int current_letter_int ;
+  char current_letter ;
+  int length_current_word ;
+  for (word=0; word<number_of_dictionary_words; word++)
+    { /* Allocate memory for the word */
+      char *ptr_word = (char *)malloc( length_max_word_dictionary * sizeof(char)) ;
+      get_line_content_from_file(&ptr_word, path_dictionary, word+1, length_max_word_dictionary) ;
+      /* Get the length of the current word */
+      length_current_word = strlen(ptr_word) ; 
+      /* Convert the letter to int */
+      for (i=0; i<length_current_word; i++)
+	{ /* Get current letter */
+	  current_letter = *(ptr_word + i) ;
+	  /* Convert it to int */
+	  current_letter_int =  (int) current_letter ;
+	  /* Keep it into the dictionary (int) array */
+	  *(array_of_array_of_dictionary_words_int+word*length_max_word_dictionary+i) = current_letter_int ;
+	}
+      /* Fill the rest of the word with the dummy token = 0 */
+      current_letter_int = dummy_index_for_no_token ;
+      for ( ; i<length_max_word_dictionary ; i++)
+	{ *(array_of_array_of_dictionary_words_int+word*length_max_word_dictionary+i) = current_letter_int ;
+	}
+      free(ptr_word) ; /* Free memory for the word */
+    }
+
+
+  /* Freeing memory */
+  free(array_of_array_of_proposed_token_int) ;
+  free(array_of_array_of_dictionary_words_int) ;
   
-  /* CURRENTLY IN DEV
-     Test the filling of the two arrays above.
-     Write and read.
-  */
-
-
-
-
-
-
-    
   /* Printing a message before leaving script with sucess code */
   printf("\nEnd of script.\n") ;
   return EXIT_SUCCESS ;
